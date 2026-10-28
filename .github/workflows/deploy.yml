@@ -29,7 +29,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           mkdir _site
-          cp -r index.html 404.html .nojekyll css js _site/
+          cp -r index.html 404.html .nojekyll css js fonts _site/
           node .github/scripts/write-config.js _site/js/config.js
           # Version every script and stylesheet URL so browsers never mix old and new files after a deploy.
           V="${GITHUB_SHA::7}"

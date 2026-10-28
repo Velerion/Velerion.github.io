@@ -27,6 +27,7 @@
   --shadow: 0 1px 2px rgba(18, 18, 32, 0.04), 0 8px 24px -12px rgba(18, 18, 32, 0.12);
   --radius: 16px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --display: var(--font);
   --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: light;
 }
@@ -94,7 +95,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var
 a { color: var(--accent); text-underline-offset: 3px; }
 code, .mono { font-family: var(--mono); font-size: 0.9em; }
 code { background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 6px; }
-h1, h2, h3 { letter-spacing: -0.02em; line-height: 1.15; }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; line-height: 1.15; }
 h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 0 0 0.4rem; }
 h3 { font-size: 1.05rem; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
 p { margin: 0 0 0.75rem; }
@@ -109,7 +110,7 @@ p { margin: 0 0 0.75rem; }
 .skip:focus { left: 8px; }
 
 /* logo */
-.logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.03em; color: var(--text); text-decoration: none; }
+.logo { font-family: var(--display); display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.03em; color: var(--text); text-decoration: none; }
 .logo.big { font-size: 1.6rem; }
 .logo.small { font-size: 1rem; }
 .logo-mark { width: 1.35em; height: 1.35em; border-radius: 0.38em; background: linear-gradient(135deg, var(--accent), var(--accent-2)); position: relative; flex: none; }
@@ -181,7 +182,7 @@ input[aria-invalid='true'] { border-color: var(--err); box-shadow: 0 0 0 4px var
 
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
 .stat { padding: 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--border); }
-.stat-value { font: 700 1.55rem/1.1 var(--font); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-value { font: 700 1.55rem/1.1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
 
 /* result */
@@ -418,6 +419,82 @@ details.card > summary { cursor: pointer; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Theme toggle                                                        */
+/* ------------------------------------------------------------------ */
+.skin-toggle {
+  margin-left: 8px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; min-height: 36px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: 600 0.82rem var(--font); cursor: pointer; white-space: nowrap;
+}
+.skin-toggle:hover { border-color: var(--accent); }
+.skin-dot { width: 12px; height: 12px; border-radius: 50%; background: #DC2626; box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3px #DC2626; }
+[data-skin='red'] .skin-dot { background: #6A4CFF; box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 3px #6A4CFF; }
+
+/* ------------------------------------------------------------------ */
+/* White and red theme (data-skin="red")                                */
+/* Based on the "clean" design style: white surfaces, near-black text,  */
+/* one red accent, 8px corners, Poppins / Roboto / Inconsolata.          */
+/* ------------------------------------------------------------------ */
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/poppins-600.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/poppins-700.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/poppins-800.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/roboto.woff2') format('woff2'); }
+@font-face { font-family: 'Inconsolata'; font-style: normal; font-weight: 500 700; font-display: swap; src: url('/fonts/inconsolata.woff2') format('woff2'); }
+
+:root[data-skin='red'] {
+  --bg: #FFFFFF;
+  --bg-alt: #F9FAFB;
+  --surface: #FFFFFF;
+  --surface-2: #F3F4F6;
+  --border: #E5E7EB;
+  --text: #111827;
+  --muted: #4B5563;
+  --accent: #DC2626;
+  --accent-2: #B91C1C;
+  --accent-soft: #FEF2F2;
+  --on-accent: #FFFFFF;
+  --ok: #15803D;
+  --ok-soft: #F0FDF4;
+  --warn: #B45309;
+  --warn-soft: #FFFBEB;
+  --err: #B91C1C;
+  --err-soft: #FEF2F2;
+  --c-chain: #DC2626;
+  --c-oa: #1F2937;
+  --c-list: #9CA3AF;
+  --path: #D97706;
+  --path-soft: #FFFBEB;
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 4px 12px -6px rgba(17, 24, 39, 0.10);
+  --radius: 8px;
+  --font: 'Roboto', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --display: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Inconsolata', ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+[data-skin='red'] .hero,
+[data-skin='red'] .screen { background: var(--bg); }
+[data-skin='red'] .hero { border-bottom: 1px solid var(--border); }
+[data-skin='red'] .hero h1 { letter-spacing: -0.03em; }
+[data-skin='red'] .grad { background: none; color: var(--accent); -webkit-text-fill-color: currentColor; }
+[data-skin='red'] .eyebrow { color: var(--accent); }
+[data-skin='red'] .logo-mark,
+[data-skin='red'] .progress span,
+[data-skin='red'] .meme::before { background: var(--accent); }
+[data-skin='red'] .btn,
+[data-skin='red'] .tab,
+[data-skin='red'] input[type='text'],
+[data-skin='red'] input[type='url'],
+[data-skin='red'] input[type='search'],
+[data-skin='red'] .alias-row { border-radius: 8px; }
+[data-skin='red'] .shortener { border-radius: 12px; box-shadow: var(--shadow); }
+[data-skin='red'] .result { border-radius: 12px; border-color: var(--accent); }
+[data-skin='red'] .tab[aria-selected='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+[data-skin='red'] .stat { background: var(--surface); }
+[data-skin='red'] .section.alt { background: var(--bg-alt); }
+[data-skin='red'] code,
+[data-skin='red'] .mono { font-size: 0.95em; }
 
 @media print {
   body { background: #fff; color: #000; }

@@ -15,7 +15,8 @@
   const MEMES = window.MEMES || [];
 
   const PREFS_KEY = 'velerion-prefs-v1';
-  const OWNED_KEY = 'hashlink-owned-v1'; // kept from the first version so existing owners keep their links
+  const OWNED_KEY = 'hashlink-owned-v1';
+  const SKIN_KEY = 'velerion-skin'; // colour theme: 'violet' (default) or 'red' // kept from the first version so existing owners keep their links
   const CODE_RE = /^[A-Za-z0-9_-]{1,24}$/;
   const PAGE_SIZE = 12;
   const VIZ_LIMIT = { chainNodes: 8, listNodes: 80, slots: 400 };
@@ -815,6 +816,17 @@
   /* start-up                                                            */
   /* ------------------------------------------------------------------ */
 
+  /* Colour theme: the default violet look, or the white-and-red one (js/theme.js applies it early). */
+  function applySkin(skin) {
+    const red = skin === 'red';
+    if (red) document.documentElement.setAttribute('data-skin', 'red');
+    else document.documentElement.removeAttribute('data-skin');
+    $('skin-btn').setAttribute('aria-pressed', String(red));
+    $('skin-label').textContent = red ? 'Violet theme' : 'Red theme';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', red ? '#FFFFFF' : '#0d0d14');
+  }
+
   function setMode() {
     const cloud = state.store.mode === 'cloud';
     const badge = $('mode-badge');
@@ -892,6 +904,12 @@
       location.replace(basePath());
     });
     $('redirect-stay').addEventListener('click', leaveRedirect);
+    $('skin-btn').addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-skin') === 'red' ? 'violet' : 'red';
+      applySkin(next);
+      try { localStorage.setItem(SKIN_KEY, next); } catch (_) {}
+      toast(next === 'red' ? 'White and red theme on' : 'Violet theme on');
+    });
     window.addEventListener('hashchange', handleRoute);
   }
 
@@ -928,6 +946,7 @@
       : new LocalStore(entries);
     loadOwned();
     setMode();
+    applySkin(document.documentElement.getAttribute('data-skin') === 'red' ? 'red' : 'violet');
     bind();
     setView(state.view);
     await load();
