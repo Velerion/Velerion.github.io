@@ -9,7 +9,7 @@
   'use strict';
 
   const { ChainingHashTable, OpenAddressingHashTable, LinkedList, Stack, CircularQueue,
-    hashIndex, hashSteps, nextPrime, randomCode, mulberry32, TOMBSTONE } = window.DSA;
+    hashIndex, hashSteps, nextPrime, randomCode, TOMBSTONE } = window.DSA;
   const { CloudStore, LocalStore } = window.HashLinkStorage;
   const CONFIG = window.HASHLINK_CONFIG || {};
   const MEMES = window.MEMES || [];
@@ -17,7 +17,6 @@
   const PREFS_KEY = 'velerion-prefs-v1';
   const OWNED_KEY = 'hashlink-owned-v1'; // kept from the first version so existing owners keep their links
   const CODE_RE = /^[A-Za-z0-9_-]{1,24}$/;
-  const LOAD_SIZES = [5, 7, 11, 13, 17, 23, 31, 53, 97];
   const PAGE_SIZE = 12;
   const VIZ_LIMIT = { chainNodes: 8, listNodes: 80, slots: 400 };
   const REDIRECT_MS = CONFIG.redirectDelayMs == null ? 2500 : CONFIG.redirectDelayMs;
@@ -192,9 +191,6 @@
     saveOwned();
   }
 
-  // The 32 built-in sample links (deterministic codes), kept apart from user links in the UI.
-  const sampleCodes = new ChainingHashTable(53, { autoGrow: false });
-  const isSample = (c) => sampleCodes.has(c);
   const canDelete = (c) => state.store.mode !== 'cloud' || state.owned.has(c);
 
   /* ------------------------------------------------------------------ */
@@ -263,22 +259,6 @@
 
   function removeLocal(c) {
     return { chain: state.chain.remove(c), oa: state.oa.remove(c), list: state.list.remove(c) };
-  }
-
-  function initSamples() {
-    for (const e of seedEntries()) sampleCodes.insert(e.code, true);
-  }
-
-  function seedEntries() {
-    const rng = mulberry32(window.SEED.SEED_RNG);
-    const start = Date.parse('2026-10-27T00:00:00Z');
-    const used = new ChainingHashTable(53);
-    return window.SEED.SEED_URLS.map((url, i) => {
-      let c;
-      do c = randomCode(rng); while (used.has(c));
-      used.insert(c, true);
-      return { code: c, url, clicks: 0, created: new Date(start + i * 1000).toISOString() };
-    });
   }
 
   // New links get 7 random characters (62^7 ≈ 3.5 trillion codes), so private links can't be guessed.
@@ -383,7 +363,7 @@
     if (!url) return;
     $('lookup-result').querySelector('.lookup-card')?.append(h('div', { class: 'callout' },
       h('strong', null, 'This is someone else’s private link. '),
-      'Private links are never downloaded into your hash table (it holds only the public demo links and yours), so the database looked it up by its exact code: ',
+      'Private links are never downloaded into your hash table (it holds only your own links), so the database looked it up by its exact code: ',
       h('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, url)));
   }
 
@@ -519,72 +499,6 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /* measurements                                                        */
-  /* ------------------------------------------------------------------ */
-
-  function measure() {
-    const rows = [];
-    for (const node of state.list) {
-      const k = node.key;
-      rows.push({
-        code: k,
-        bucket: state.chain.indexFor(k),
-        chain: state.chain.get(k).comparisons,
-        oa: state.oa.get(k).comparisons,
-        list: state.list.search(k).comparisons,
-      });
-    }
-    const n = rows.length;
-    const avg = (f) => (n ? rows.reduce((s, r) => s + r[f], 0) / n : 0);
-    const max = (f) => rows.reduce((m, r) => Math.max(m, r[f]), 0);
-
-    // Unsuccessful searches: 6-character codes never clash with 5-character generated ones.
-    const rng = mulberry32(7);
-    const misses = { chain: 0, oa: 0, list: 0 };
-    const trials = 200;
-    for (let i = 0; i < trials; i++) {
-      let k;
-      do k = randomCode(rng, 6); while (state.chain.has(k));
-      misses.chain += state.chain.get(k).comparisons;
-      misses.oa += state.oa.get(k).comparisons;
-      misses.list += state.list.search(k).comparisons;
-    }
-
-    const m = state.chain.bucketCount;
-    const a = n / m;
-    const b = state.oa.loadFactor;
-    return {
-      rows, n,
-      chain: { avg: avg('chain'), max: max('chain'), miss: misses.chain / trials,
-        theory: n ? 1 + (n - 1) / (2 * m) : 0, theoryMiss: a },
-      oa: { avg: avg('oa'), max: max('oa'), miss: misses.oa / trials,
-        theory: 0.5 * (1 + 1 / (1 - b)), theoryMiss: 0.5 * (1 + 1 / ((1 - b) * (1 - b))) - 1 },
-      list: { avg: avg('list'), max: max('list'), miss: misses.list / trials, theory: (n + 1) / 2, theoryMiss: n },
-    };
-  }
-
-  function loadFactorRows() {
-    return LOAD_SIZES.map((m) => {
-      const t = new ChainingHashTable(m, { autoGrow: false });
-      for (const node of state.list) t.insert(node.key, node.value);
-      let total = 0;
-      for (const node of state.list) total += t.get(node.key).comparisons;
-      const s = t.stats();
-      const n = state.list.size;
-      return { m, alpha: s.loadFactor, avg: n ? total / n : 0, longest: s.longestChain,
-        collisions: s.collisions, theory: n ? 1 + (n - 1) / (2 * m) : 0 };
-    });
-  }
-
-  /* "Nice" axis step: 1, 2, 5, 10, 20, 50 … so tick labels are round numbers. */
-  function niceStep(max, ticks) {
-    const raw = max / ticks;
-    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
-    const f = raw / pow;
-    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
-  }
-
-  /* ------------------------------------------------------------------ */
   /* rendering                                                           */
   /* ------------------------------------------------------------------ */
 
@@ -715,96 +629,6 @@
     $('list-viz').replaceChildren(...parts);
   }
 
-  function summaryTable(b) {
-    const row = (name, cls, d) => h('tr', null,
-      h('th', null, h('i', { class: 'dot ' + cls }), name),
-      h('td', { class: 'num' }, fmt(d.avg)), h('td', { class: 'num' }, String(d.max)),
-      h('td', { class: 'num' }, fmt(d.theory)), h('td', { class: 'num' }, fmt(d.miss)),
-      h('td', { class: 'num' }, fmt(d.theoryMiss)));
-    return h('div', { class: 'table-wrap' }, h('table', { class: 'summary' },
-      h('thead', null,
-        h('tr', null, h('th', null, ''), h('th', { colspan: 3, class: 'grp' }, 'Link exists'),
-          h('th', { colspan: 2, class: 'grp' }, 'Link does not exist')),
-        h('tr', null, h('th', null, 'Structure'), h('th', { class: 'num' }, 'average'), h('th', { class: 'num' }, 'worst'),
-          h('th', { class: 'num' }, 'theory'), h('th', { class: 'num' }, 'average'), h('th', { class: 'num' }, 'theory'))),
-      h('tbody', null,
-        row(`Hash table, chaining (${state.chain.bucketCount} buckets)`, 'c-chain', b.chain),
-        row(`Hash table, open addressing (${state.oa.capacity} slots)`, 'c-oa', b.oa),
-        row(`Linked list (${b.n} nodes)`, 'c-list', b.list))));
-  }
-
-  function renderBench() {
-    const b = measure();
-    const speedup = b.chain.avg ? b.list.avg / b.chain.avg : 0;
-    const metric = (cls, label, value, sub) => h('div', { class: 'metric' },
-      h('div', { class: 'k' }, h('i', { class: 'dot ' + cls }), label), h('div', { class: 'v' }, value), h('div', { class: 's' }, sub));
-    $('bench-summary').replaceChildren(
-      h('div', { class: 'summary-grid' },
-        metric('c-chain', 'Hash table · chaining', fmt(b.chain.avg), 'average comparisons per lookup'),
-        metric('c-oa', 'Hash table · open addressing', fmt(b.oa.avg), 'average comparisons per lookup'),
-        metric('c-list', 'Linked list', fmt(b.list.avg), b.n ? `${fmt(speedup, 1)}× more than the hash table` : '—')),
-      h('div', { class: 'card' },
-        h('p', null, 'The linked list gets slower as links are added (it checks about half of them on average: O(n)). The hash table only checks one bucket, so it stays close to 1 comparison no matter how many links there are (O(1) on average).'),
-        summaryTable(b),
-        h('p', { class: 'hint' }, 'Theory: chaining 1 + (n−1)/2m when found, α when not found · open addressing ½(1 + 1/(1−α)) and ½(1 + 1/(1−α)²) − 1 · linked list (n+1)/2 and n. The “does not exist” averages use 200 random codes.')));
-    $('bench-chart').replaceChildren(chart(b.rows));
-
-    const lf = loadFactorRows();
-    const maxAvg = Math.max(...lf.map((r) => r.avg), 1);
-    $('bench-load').replaceChildren(h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Buckets', 'Load factor', 'Collisions', 'Longest chain', 'Avg comparisons', 'Theory', ''].map((t, i) =>
-        h('th', { class: i && i < 6 ? 'num' : null }, t)))),
-      h('tbody', null, lf.map((r) => h('tr', { class: r.m === state.chain.bucketCount ? 'current' : null },
-        h('th', null, String(r.m)), h('td', { class: 'num' }, fmt(r.alpha)), h('td', { class: 'num' }, String(r.collisions)),
-        h('td', { class: 'num' }, String(r.longest)), h('td', { class: 'num' }, fmt(r.avg)), h('td', { class: 'num' }, fmt(r.theory)),
-        h('td', { class: 'mini' }, h('span', { class: 'mini-bar c-chain', style: `width:${(r.avg / maxAvg) * 100}%` }))))))));
-  }
-
-  function chart(rows) {
-    const NS = 'http://www.w3.org/2000/svg';
-    const s = (tag, attrs, text) => {
-      const el = document.createElementNS(NS, tag);
-      for (const k of Object.keys(attrs)) el.setAttribute(k, attrs[k]);
-      if (text != null) el.textContent = text;
-      return el;
-    };
-    const W = 760, H = 300, L = 42, R = 12, T = 14, B = 36;
-    const n = rows.length;
-    const dataMax = Math.max(1, ...rows.map((r) => r.list));
-    const step = niceStep(dataMax, 5);
-    const ymax = Math.ceil(dataMax / step) * step;
-    const xstep = n ? (W - L - R) / n : 0;
-    const x = (i) => L + xstep * (i + 0.5);
-    const y = (v) => T + (H - T - B) * (1 - v / ymax);
-    const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img',
-      'aria-label': 'Comparisons per link: the linked list grows in a straight line while both hash tables stay near 1' });
-
-    for (let v = 0; v <= ymax; v += step) {
-      svg.append(s('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), class: 'grid' }));
-      svg.append(s('text', { x: L - 8, y: y(v) + 4, class: 'axis', 'text-anchor': 'end' }, String(v)));
-    }
-    const bw = Math.max(1.5, xstep * 0.36);
-    rows.forEach((r, i) => {
-      svg.append(s('rect', { x: x(i) - bw - 0.5, y: y(r.chain), width: bw, height: y(0) - y(r.chain), class: 'f-chain', rx: 1.5 }));
-      svg.append(s('rect', { x: x(i) + 0.5, y: y(r.oa), width: bw, height: y(0) - y(r.oa), class: 'f-oa', rx: 1.5 }));
-      const hit = s('rect', { x: x(i) - xstep / 2, y: T, width: xstep, height: H - T - B, class: 'hit' });
-      hit.append(s('title', {}, `${r.code}: chaining ${r.chain}, open addressing ${r.oa}, linked list ${r.list}`));
-      svg.append(hit);
-    });
-    if (n) {
-      svg.append(s('polyline', { points: rows.map((r, i) => `${x(i)},${y(r.list)}`).join(' '), class: 'l-list' }));
-      if (n <= 120) rows.forEach((r, i) => svg.append(s('circle', { cx: x(i), cy: y(r.list), r: 2.6, class: 'p-list' })));
-    }
-    svg.append(s('text', { x: (L + W - R) / 2, y: H - 8, class: 'axis', 'text-anchor': 'middle' }, `Links, oldest to newest (1 … ${n})`));
-
-    return h('div', null,
-      h('div', { class: 'legend' },
-        h('span', null, h('i', { class: 'sw c-list' }), 'Linked list'),
-        h('span', null, h('i', { class: 'sw c-chain' }), 'Hash table · chaining'),
-        h('span', null, h('i', { class: 'sw c-oa' }), 'Hash table · open addressing')),
-      svg);
-  }
-
   function renderQueue() {
     const q = state.activity;
     const rear = (q.front + q.count - 1 + q.capacity) % q.capacity;
@@ -856,7 +680,7 @@
   const tableHead = () => h('thead', null, h('tr', null,
     ['#', 'Short link', 'Destination', 'Bucket', 'Clicks', ''].map((t, k) => h('th', { class: k === 3 || k === 4 ? 'num' : null }, t))));
 
-  /* "Your links": only links created in this browser. Sample links are listed separately. */
+  /* "Your links": only links created in this browser. */
   function renderTable() {
     const filter = $('filter').value.trim().toLowerCase();
     const rows = [];
@@ -866,7 +690,6 @@
       i++;
       const c = node.key;
       const v = node.value;
-      if (isSample(c)) continue;
       mine++;
       if (filter && !c.toLowerCase().includes(filter) && !v.url.toLowerCase().includes(filter)) continue;
       rows.push({ i, c, v });
@@ -890,42 +713,6 @@
       h('span', null, `Page ${state.page} of ${pages}`),
       h('button', { class: 'btn small', type: 'button', disabled: state.page === pages, onclick: () => { state.page++; renderTable(); } }, 'Older →'),
     ] : []));
-    renderSamples();
-  }
-
-  function renderSamples() {
-    if (!$('samples').open) return;
-    const rows = [];
-    let i = 0;
-    for (const node of state.list) {
-      i++;
-      if (isSample(node.key)) rows.push(linkRow(i, node.key, node.value, null));
-    }
-    $('samples-count').textContent = String(rows.length);
-    $('samples-table').replaceChildren(tableHead(), h('tbody', null, rows));
-  }
-
-  function renderReport() {
-    const b = measure();
-    const collided = [];
-    state.chain.buckets.forEach((bucket, i) => {
-      if (bucket.size > 1) collided.push({ i, keys: bucket.toArray().map((e) => e.key) });
-    });
-    $('report-body').replaceChildren(
-      h('h2', null, 'Velerion: retrieval comparison report'),
-      h('p', { class: 'muted' }, `Generated ${new Date().toLocaleString()} · ${b.n} links · chaining: ${state.chain.bucketCount} buckets (load factor ${fmt(state.chain.loadFactor)}) · open addressing: ${state.oa.capacity} slots (load factor ${fmt(state.oa.loadFactor)})`),
-      summaryTable(b),
-      h('h3', null, `Collisions resolved by chaining (${collided.length} buckets)`),
-      h('ul', { class: 'collisions' }, collided.map((c) => h('li', null, `Bucket ${c.i}: `, c.keys.join(' → ')))),
-      h('h3', null, 'Comparisons per retrieval'),
-      h('div', { class: 'table-wrap' }, h('table', null,
-        h('thead', null, h('tr', null, ['#', 'Code', 'Bucket', 'Chaining', 'Open addressing', 'Linked list'].map((t, i) => h('th', { class: i > 1 ? 'num' : null }, t)))),
-        h('tbody', null, b.rows.map((r, i) => h('tr', null,
-          h('td', null, String(i + 1)), h('td', { class: 'mono' }, r.code), h('td', { class: 'num' }, String(r.bucket)),
-          h('td', { class: 'num' }, String(r.chain)), h('td', { class: 'num' }, String(r.oa)), h('td', { class: 'num' }, String(r.list))))),
-        h('tfoot', null, h('tr', null, h('th', { colspan: 3 }, 'Total'),
-          ['chain', 'oa', 'list'].map((f) => h('th', { class: 'num' }, String(b.rows.reduce((s, r) => s + r[f], 0)))))))));
-    return b;
   }
 
   function setView(view) {
@@ -941,11 +728,9 @@
     renderChain();
     renderOA();
     renderList();
-    renderBench();
     renderQueue();
     renderStack();
     renderTable();
-    if ($('report-details').open) renderReport();
   }
 
   /* ------------------------------------------------------------------ */
@@ -1035,7 +820,6 @@
     const badge = $('mode-badge');
     badge.textContent = cloud ? '● Live · links work everywhere' : '● Demo mode · this browser only';
     badge.className = 'pill ' + (cloud ? 'ok' : 'warn');
-    $('reset-btn').hidden = cloud;
     $('alias-prefix').textContent = displayUrl('').replace(/#\/$/, '#/');
   }
 
@@ -1066,10 +850,7 @@
         saveOwned();
       }
     }
-    if (!list || (!list.length && state.store.mode === 'local')) {
-      list = seedEntries();
-      await state.store.addMany(list);
-    }
+    if (!list) list = [];
     build(list);
   }
 
@@ -1087,13 +868,6 @@
       if (!c) return toast('Enter a short link or code.', { type: 'error' });
       retrieve(c);
     });
-    $('random-btn').addEventListener('click', () => {
-      const all = entries();
-      if (!all.length) return;
-      const c = all[Math.floor(Math.random() * all.length)].code;
-      $('lookup-code').value = c;
-      retrieve(c);
-    });
     $('delete-btn').addEventListener('click', () => {
       const c = parseCode($('lookup-code').value);
       if (!c) return toast('Enter the short link or code to delete.', { type: 'error' });
@@ -1108,7 +882,6 @@
     });
 
     $('filter').addEventListener('input', () => { state.page = 1; renderTable(); });
-    $('samples').addEventListener('toggle', renderSamples);
     $('forget-btn').addEventListener('click', () => {
       if (!window.confirm('Forget this browser? Your links keep working for anyone who has them, but this browser will no longer list them or be able to delete them. Use this on a shared computer.')) return;
       try {
@@ -1117,23 +890,6 @@
         sessionStorage.clear();
       } catch (_) {}
       location.replace(basePath());
-    });
-    $('report-details').addEventListener('toggle', () => { if ($('report-details').open) renderReport(); });
-    $('print-btn').addEventListener('click', () => {
-      $('report-details').open = true;
-      const b = renderReport();
-      console.table(b.rows);
-      window.print();
-    });
-    $('reset-btn').addEventListener('click', async () => {
-      if (!window.confirm('Reset to the 32 demo links? Links you added in this browser will be removed.')) return;
-      state.store.clear();
-      state.undo = new Stack();
-      state.activity = new CircularQueue(10);
-      state.hl = null;
-      savePrefs();
-      await load();
-      renderAll();
     });
     $('redirect-stay').addEventListener('click', leaveRedirect);
     window.addEventListener('hashchange', handleRoute);
@@ -1166,7 +922,6 @@
     }
     const started = Date.now();
 
-    initSamples();
     loadPrefs();
     state.store = CONFIG.supabaseUrl && CONFIG.supabaseKey
       ? new CloudStore(CONFIG.supabaseUrl, CONFIG.supabaseKey)

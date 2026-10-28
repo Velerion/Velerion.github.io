@@ -50,7 +50,6 @@
       <nav class="nav-links" aria-label="Sections">
         <a href="#lookup">Find</a>
         <a href="#inside">How it works</a>
-        <a href="#performance">Performance</a>
         <a href="#links">Your links</a>
       </nav>
       <span id="mode-badge" class="pill"></span>
@@ -97,7 +96,6 @@
           <input id="lookup-code" type="text" placeholder="velerion.github.io/aZ3kQ or aZ3kQ" maxlength="200" spellcheck="false">
           <div class="lookup-actions">
             <button class="btn primary" type="submit">Find</button>
-            <button class="btn" type="button" id="random-btn">Random</button>
             <button class="btn danger" type="button" id="delete-btn">Delete</button>
           </div>
         </form>
@@ -168,28 +166,6 @@
       </div>
     </section>
 
-    <section class="section" id="performance">
-      <div class="wrap">
-        <div class="section-head row-head">
-          <div>
-            <h2>Performance</h2>
-            <p>Key comparisons needed to retrieve every stored link, measured live.</p>
-          </div>
-          <button class="btn" id="print-btn" type="button">Print report</button>
-        </div>
-        <div id="bench-summary"></div>
-        <div class="card">
-          <h3>Comparisons per link</h3>
-          <div id="bench-chart" class="chart"></div>
-        </div>
-        <div class="card">
-          <h3>What table size does</h3>
-          <p class="muted">The current links re-inserted into fixed-size chaining tables. Fewer buckets mean longer chains and more comparisons.</p>
-          <div id="bench-load"></div>
-        </div>
-      </div>
-    </section>
-
     <section class="section alt" id="activity">
       <div class="wrap two-col">
         <div class="card">
@@ -219,23 +195,9 @@
         </div>
         <div class="card flush"><div class="table-wrap"><table class="links" id="links-table"></table></div></div>
         <div class="pager" id="pager"></div>
-        <details class="card samples" id="samples">
-          <summary>Built-in sample links (<span id="samples-count">32</span>): the demo dataset for the hash table, not created by any user</summary>
-          <p class="muted">The project needs at least 30 entries to show collisions, so the hash table starts with these public reference links. Other people's links are private and are never shown here.</p>
-          <div class="table-wrap"><table class="links" id="samples-table"></table></div>
-        </details>
-        <div class="row end"><button class="btn small ghost" id="reset-btn" type="button" hidden>Reset demo data</button></div>
       </div>
     </section>
 
-    <section class="section" id="report-section">
-      <div class="wrap">
-        <details id="report-details" class="card">
-          <summary>Full comparison report (printable)</summary>
-          <div id="report-body"></div>
-        </details>
-      </div>
-    </section>
   </main>
 
   <footer class="footer">
@@ -249,7 +211,6 @@
 
   <script src="/js/config.js"></script>
   <script src="/js/structures.js"></script>
-  <script src="/js/seed.js"></script>
   <script src="/js/memes.js"></script>
   <script src="/js/storage.js"></script>
   <script src="/js/app.js"></script>

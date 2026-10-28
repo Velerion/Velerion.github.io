@@ -10,7 +10,7 @@ const {
   ChainingHashTable, OpenAddressingHashTable, LinkedList, Stack, CircularQueue,
   hashSteps, randomCode, mulberry32,
 } = require('../js/structures.js');
-const { SEED_URLS, SEED_RNG } = require('../js/seed.js');
+const { SEED_URLS, SEED_RNG } = require('./seed.js');
 
 const buckets = Number(process.argv[2]) || 17;
 const chain = new ChainingHashTable(buckets);

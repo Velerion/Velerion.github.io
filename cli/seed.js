@@ -1,5 +1,5 @@
-/* 32 seed URLs loaded on first visit. Short codes are generated from a fixed PRNG seed,
- * so every visitor gets the same codes and the same collisions. */
+/* 32 sample URLs for the console demo (cli/demo.js). Short codes come from a fixed PRNG seed,
+ * so every run gets the same codes and the same collisions. */
 (function (global) {
   'use strict';
 

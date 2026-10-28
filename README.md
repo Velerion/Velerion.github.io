@@ -9,17 +9,17 @@ A free, working URL shortener built on a **hand-written hash table**, with a **l
 | Requirement | Where |
 |---|---|
 | Hash table mapping short codes → long URLs, collisions handled explicitly | `ChainingHashTable` (separate chaining) and `OpenAddressingHashTable` (linear probing with tombstones) in `js/structures.js` |
-| At least 30 entries | 32 seed URLs (`js/seed.js`); the table holds them in 37 buckets, with about a dozen collisions |
+| At least 30 entries | `node cli/demo.js` loads 32 sample URLs (`cli/seed.js`) into the same structures: 37 buckets, about a dozen collisions. The website itself holds only links people create. |
 | Linked-list sequential-search baseline | `LinkedList.search` in `js/structures.js` |
 | Shorten / retrieve / delete | The shortener at the top, **Find or delete a link**, and real redirects for every short link |
 | Visible collision being resolved | **How it works → Separate chaining → Force a collision**, the result chips, and the highlighted chain |
-| Printed comparison of retrieval comparisons | **Performance** section, **Print report**, and `node cli/demo.js` |
+| Printed comparison of retrieval comparisons | `node cli/demo.js` prints the full per-link comparison table; on the site, every Find shows the comparison count of all three structures |
 
 ### Course outcomes
 
 - **CO1 (stack / queue):** deleted links go on an **undo stack** (linked stack, LIFO); recent operations are kept in a **circular queue** of capacity 10, shown with its front and rear pointers.
 - **CO2 (choosing a data structure):** the same data sits in three structures side by side: chaining, open addressing and a linked list. The table-size experiment shows how the load factor changes chain length.
-- **CO3 (search performance):** average and worst-case comparisons when a link exists and when it doesn't, compared with the textbook formulas, plus a per-link chart (a straight line for the list, flat for the hash tables).
+- **CO3 (search performance):** every lookup on the site reports its key comparisons in all three structures, and `node cli/demo.js` prints average and per-link comparisons for 32 links (about 1.5 for the hash table vs 16.5 for the linked list).
 
 ## The hash function, in one line
 
@@ -42,16 +42,16 @@ Both tables follow one rule: **when too full, about double the size (the next pr
 ## Architecture
 
 - **Static site** on GitHub Pages (`Velerion/Velerion.github.io`). `404.html` + `js/route.js` turn `/aZ3kQ` into `/#/aZ3kQ`, and the app resolves it.
-- **Supabase Postgres** stores the rows only. On page load the app fetches the public demo links (1,000 per request) plus your own links, and rebuilds the hash tables and the linked list in memory, so all searching is done by our own structures. Other people's private links are resolved by exact code on the server when opened.
+- **Supabase Postgres** stores the rows only. On page load the app fetches the links you created (proving ownership with their secret keys), and rebuilds the hash tables and the linked list in memory, so all searching is done by our own structures. Other people's private links are resolved by exact code on the server when opened.
 - No `Map`, `Set` or plain-object dictionaries are used for storage anywhere.
 
 ## Security
 
 | Threat | Protection |
 |---|---|
-| Seeing other people's links | Links are **private**. The database lets anyone list only the 32 public demo links. Your browser additionally loads the links it created, proving ownership with their secret tokens (`my_links`). Any other link opens only through `resolve_link(exact code)`; there is no listing, searching or partial matching. |
+| Seeing other people's links | Links are **private**. Nobody can list links. Your browser loads only the links it created, proving ownership with their secret tokens (`my_links`). Any other link opens only through `resolve_link(exact code)`; there is no listing, searching or partial matching. |
 | Guessing someone's link | New codes are 7 random characters from a cryptographic generator (62⁷ ≈ 3.5 trillion), and lookups are limited to 120 per minute per network. New links are created only through `create_link`, whose rate limit also counts attempts on codes that are already taken, so creating links can't be used to probe which codes exist. Finding one link by guessing would take centuries. |
-| Deleting someone else's link | Each link gets a random delete token kept only in its creator's browser. Deletes go through `delete_link(code, token)`, and the token can be written but never read. The demo links have no token, so nobody can delete them. |
+| Deleting someone else's link | Each link gets a random delete token kept only in its creator's browser. Deletes go through `delete_link(code, token)`, and the token can be written but never read. |
 | Editing or hijacking a link | The public role has no UPDATE or DELETE rights. The server sets `clicks`, `created_at` and `is_public` itself. |
 | Spam / flooding | 20 new links per minute per network and 300 in total, enforced in the database. The limiter uses the IP that Supabase's proxy appends, so a forged `X-Forwarded-For` header doesn't bypass it. IPv6 clients are counted per /64. `my_links` and `delete_link` are rate limited too. IPs are stored only as MD5 hashes and kept for 5 minutes. |
 | Malicious URLs | `http(s)` only, ≤ 2048 characters, checked by the database **and** the app. Links with credentials (refused by both), to private/local addresses, or back to Velerion are refused, and the redirect screen shows the destination first. |
@@ -102,10 +102,10 @@ index.html            page layout
 404.html, js/route.js turn /<code> into /#/<code> on GitHub Pages
 css/style.css         styles (light + dark, responsive)
 js/structures.js      hash function, LinkedList, ChainingHashTable, OpenAddressingHashTable, Stack, CircularQueue
-js/app.js             UI, measurements, chart, redirects
+js/app.js             UI, lookups, step-by-step views, redirects
 js/storage.js         Supabase / localStorage persistence (no lookups)
 js/memes.js           loading-screen memes
-js/seed.js            32 seed URLs
+cli/seed.js           32 sample URLs for the console demo
 js/config.js          Supabase settings
 supabase/setup.sql    table, security policies, rate limit
 security/pentest.mjs  automated security tests
