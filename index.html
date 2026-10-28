@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; manifest-src 'self'">
+  <meta name="referrer" content="no-referrer">
+  <title>Velerion · Short links, hashed in plain sight</title>
+  <meta name="description" content="A free URL shortener built on a hand-written hash table. See every hash, collision and comparison as it happens.">
+  <meta name="theme-color" content="#0d0d14">
+  <meta property="og:title" content="Velerion · Short links, hashed in plain sight">
+  <meta property="og:description" content="A URL shortener built on a hand-written hash table, with a linked-list baseline and live comparison counts.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237c5cff'/%3E%3Cpath d='M9 10l7 13 7-13' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Loading screen (first load) -->
+  <div id="loader" class="screen">
+    <div class="screen-inner">
+      <div class="logo big"><span class="logo-mark" aria-hidden="true"></span>velerion</div>
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="screen-status" id="loader-status">Loading links and building the hash table…</p>
+      <div class="meme-slot" id="loader-meme"></div>
+    </div>
+  </div>
+
+  <!-- Redirect screen (opened through a short link) -->
+  <div id="redirect" class="screen" hidden>
+    <div class="screen-inner">
+      <div class="logo big"><span class="logo-mark" aria-hidden="true"></span>velerion</div>
+      <p class="eyebrow" id="redirect-eyebrow">Looking up your link…</p>
+      <h1 class="redirect-host" id="redirect-host"></h1>
+      <p class="redirect-url" id="redirect-url"></p>
+      <div class="progress" id="redirect-progress" hidden><span></span></div>
+      <p class="redirect-stats" id="redirect-stats"></p>
+      <div class="redirect-actions">
+        <a id="redirect-go" class="btn primary" hidden rel="noopener noreferrer">Go now</a>
+        <button id="redirect-stay" class="btn ghost" type="button">Cancel</button>
+      </div>
+      <div class="meme-slot" id="redirect-meme"></div>
+    </div>
+  </div>
+
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="logo" href="#top" aria-label="Velerion home"><span class="logo-mark" aria-hidden="true"></span>velerion</a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#lookup">Find</a>
+        <a href="#inside">How it works</a>
+        <a href="#performance">Performance</a>
+        <a href="#links">Your links</a>
+      </nav>
+      <span id="mode-badge" class="pill"></span>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-inner">
+        <p class="eyebrow">Free URL shortener · DSA Micro Project 02</p>
+        <h1>Short links,<br><span class="grad">hashed in plain sight.</span></h1>
+        <p class="lede">Paste a long URL to get a short one. Then see exactly how a hand-written hash table stores it, resolves collisions and finds it again.</p>
+
+        <form id="shorten-form" class="shortener" autocomplete="off" novalidate>
+          <label class="sr-only" for="long-url">Long URL</label>
+          <div class="shortener-row">
+            <input id="long-url" type="url" inputmode="url" placeholder="Paste a long link, e.g. https://example.com/a/very/long/path" maxlength="2048" required>
+            <button class="btn primary lg" type="submit" id="shorten-btn">Shorten</button>
+          </div>
+          <details class="alias">
+            <summary>Choose your own ending (optional)</summary>
+            <div class="alias-row">
+              <span class="alias-prefix" id="alias-prefix">velerion.github.io/</span>
+              <label class="sr-only" for="alias">Custom ending</label>
+              <input id="alias" type="text" placeholder="my-link" maxlength="24" spellcheck="false">
+            </div>
+            <p class="hint">Letters, numbers, “-” and “_”, up to 24 characters.</p>
+          </details>
+        </form>
+
+        <div id="result" class="result" hidden></div>
+        <div class="stats" id="stats"></div>
+      </div>
+    </section>
+
+    <section class="section" id="lookup">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Find or delete a link</h2>
+          <p>Paste a short link or just its code. All three data structures search for it, and each one's comparison count is shown. You can delete only links created in this browser.</p>
+        </div>
+        <form id="lookup-form" class="card lookup" autocomplete="off" novalidate>
+          <label class="sr-only" for="lookup-code">Short link or code</label>
+          <input id="lookup-code" type="text" placeholder="velerion.github.io/aZ3kQ or aZ3kQ" maxlength="200" spellcheck="false">
+          <div class="lookup-actions">
+            <button class="btn primary" type="submit">Find</button>
+            <button class="btn" type="button" id="random-btn">Random</button>
+            <button class="btn danger" type="button" id="delete-btn">Delete</button>
+          </div>
+        </form>
+        <div id="lookup-result"></div>
+      </div>
+    </section>
+
+    <section class="section alt" id="inside">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>How it works</h2>
+          <p>Every link is stored three ways: in a hash table with separate chaining, in a hash table with open addressing, and in a plain linked list for comparison.</p>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Data structures">
+          <button class="tab" role="tab" type="button" data-view="hash" id="tab-hash">1 · Hashing</button>
+          <button class="tab" role="tab" type="button" data-view="chain" id="tab-chain">2 · Separate chaining</button>
+          <button class="tab" role="tab" type="button" data-view="open" id="tab-open">3 · Open addressing</button>
+          <button class="tab" role="tab" type="button" data-view="list" id="tab-list">4 · Linked list</button>
+        </div>
+
+        <div class="card panel" id="panel-hash" role="tabpanel" aria-labelledby="tab-hash">
+          <div class="explain">
+            <div>
+              <h3>The hash function</h3>
+              <p>A short code is turned into a bucket number, one character at a time:</p>
+              <p class="formula">h = (h × 31 + character code) mod <span id="formula-m">m</span></p>
+              <p class="muted">Start with h = 0. Taking the remainder at every step keeps the numbers small, and the final h is the bucket. The same code always gives the same bucket, so finding a link means checking just that one bucket.</p>
+            </div>
+            <div class="try">
+              <label for="hash-input">Try any code</label>
+              <input id="hash-input" type="text" maxlength="24" spellcheck="false">
+            </div>
+          </div>
+          <div id="hash-steps"></div>
+        </div>
+
+        <div class="card panel" id="panel-chain" role="tabpanel" aria-labelledby="tab-chain" hidden>
+          <div class="panel-head">
+            <div>
+              <h3>Separate chaining</h3>
+              <p class="muted">Each bucket is a small linked list. When two codes land in the same bucket (a <strong>collision</strong>), the new one is added to the end of that bucket's chain. <strong>Growth rule:</strong> when there are more links than buckets, the table doubles in size (to the next prime) and every link is re-hashed.</p>
+            </div>
+            <button class="btn" type="button" id="collide-btn">Force a collision</button>
+          </div>
+          <ul class="growth" id="chain-growth"></ul>
+          <div id="chain-viz" class="chain-viz"></div>
+        </div>
+
+        <div class="card panel" id="panel-open" role="tabpanel" aria-labelledby="tab-open" hidden>
+          <h3>Open addressing (linear probing)</h3>
+          <p class="muted">One link per slot. If a code's home slot is taken, try the next slot, then the next, until one is free. A deleted slot keeps a <strong>tombstone</strong> so later searches don't stop early. <strong>Growth rule:</strong> once 70% of slots are used, the table doubles (to the next prime) and every link is re-inserted.</p>
+          <ul class="growth" id="oa-growth"></ul>
+          <div class="legend">
+            <span><i class="sw sw-home"></i>in its home slot</span>
+            <span><i class="sw sw-moved"></i>moved by a collision</span>
+            <span><i class="sw sw-tomb"></i>tombstone</span>
+            <span><i class="sw sw-path"></i>last search path</span>
+          </div>
+          <div id="oa-viz" class="oa-viz"></div>
+        </div>
+
+        <div class="card panel" id="panel-list" role="tabpanel" aria-labelledby="tab-list" hidden>
+          <h3>Linked list (the baseline)</h3>
+          <p class="muted">The same links in one chain, oldest first. There is no shortcut: a search starts at <code>head</code> and checks each node in turn, so the last link needs as many comparisons as there are links.</p>
+          <div id="list-viz" class="list-viz"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="performance">
+      <div class="wrap">
+        <div class="section-head row-head">
+          <div>
+            <h2>Performance</h2>
+            <p>Key comparisons needed to retrieve every stored link, measured live.</p>
+          </div>
+          <button class="btn" id="print-btn" type="button">Print report</button>
+        </div>
+        <div id="bench-summary"></div>
+        <div class="card">
+          <h3>Comparisons per link</h3>
+          <div id="bench-chart" class="chart"></div>
+        </div>
+        <div class="card">
+          <h3>What table size does</h3>
+          <p class="muted">The current links re-inserted into fixed-size chaining tables. Fewer buckets mean longer chains and more comparisons.</p>
+          <div id="bench-load"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt" id="activity">
+      <div class="wrap two-col">
+        <div class="card">
+          <h3>Recent activity <span class="muted">· circular queue, capacity 10</span></h3>
+          <div id="queue-viz"></div>
+        </div>
+        <div class="card">
+          <h3>Undo stack <span class="muted">· last in, first out</span></h3>
+          <div id="stack-viz"></div>
+          <button class="btn" type="button" id="undo-btn">Undo last delete</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="links">
+      <div class="wrap">
+        <div class="section-head row-head">
+          <div>
+            <h2>Your links</h2>
+            <p id="links-count"></p>
+          </div>
+          <div class="table-tools">
+            <button class="btn small ghost" id="forget-btn" type="button">Forget this browser</button>
+            <label class="sr-only" for="filter">Search your links</label>
+            <input id="filter" type="search" placeholder="Search code or URL" maxlength="100">
+          </div>
+        </div>
+        <div class="card flush"><div class="table-wrap"><table class="links" id="links-table"></table></div></div>
+        <div class="pager" id="pager"></div>
+        <details class="card samples" id="samples">
+          <summary>Built-in sample links (<span id="samples-count">32</span>): the demo dataset for the hash table, not created by any user</summary>
+          <p class="muted">The project needs at least 30 entries to show collisions, so the hash table starts with these public reference links. Other people's links are private and are never shown here.</p>
+          <div class="table-wrap"><table class="links" id="samples-table"></table></div>
+        </details>
+        <div class="row end"><button class="btn small ghost" id="reset-btn" type="button" hidden>Reset demo data</button></div>
+      </div>
+    </section>
+
+    <section class="section" id="report-section">
+      <div class="wrap">
+        <details id="report-details" class="card">
+          <summary>Full comparison report (printable)</summary>
+          <div id="report-body"></div>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <span class="logo small"><span class="logo-mark" aria-hidden="true"></span>velerion</span>
+      <span class="muted">Hash tables, a linked list, a stack and a queue, all written by hand in <code>js/structures.js</code>. Links you create are private: they are never listed, and only people you share them with can open them.</span>
+    </div>
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/structures.js"></script>
+  <script src="/js/seed.js"></script>
+  <script src="/js/memes.js"></script>
+  <script src="/js/storage.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
